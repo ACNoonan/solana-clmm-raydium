@@ -36,7 +36,7 @@ pub fn get_liquidity_from_amount_0(
 ) -> u128 {
     // sqrt_ratio_a_x64 should hold the smaller value
     if sqrt_ratio_a_x64 > sqrt_ratio_b_x64 {
-        std::mem::swap(&mut sqrt_ratio_a_x64, &mut sqrt_ratio_b_x64);
+        core::mem::swap(&mut sqrt_ratio_a_x64, &mut sqrt_ratio_b_x64);
     };
     let intermediate = U128::from(sqrt_ratio_a_x64)
         .mul_div_floor(
@@ -63,7 +63,7 @@ pub fn get_liquidity_from_amount_1(
 ) -> u128 {
     // sqrt_ratio_a_x64 should hold the smaller value
     if sqrt_ratio_a_x64 > sqrt_ratio_b_x64 {
-        std::mem::swap(&mut sqrt_ratio_a_x64, &mut sqrt_ratio_b_x64);
+        core::mem::swap(&mut sqrt_ratio_a_x64, &mut sqrt_ratio_b_x64);
     };
 
     U128::from(amount_1)
@@ -86,7 +86,7 @@ pub fn get_liquidity_from_amounts(
 ) -> u128 {
     // sqrt_ratio_a_x64 should hold the smaller value
     if sqrt_ratio_a_x64 > sqrt_ratio_b_x64 {
-        std::mem::swap(&mut sqrt_ratio_a_x64, &mut sqrt_ratio_b_x64);
+        core::mem::swap(&mut sqrt_ratio_a_x64, &mut sqrt_ratio_b_x64);
     };
 
     if sqrt_ratio_x64 <= sqrt_ratio_a_x64 {
@@ -115,7 +115,7 @@ pub fn get_liquidity_from_single_amount_0(
 ) -> u128 {
     // sqrt_ratio_a_x64 should hold the smaller value
     if sqrt_ratio_a_x64 > sqrt_ratio_b_x64 {
-        std::mem::swap(&mut sqrt_ratio_a_x64, &mut sqrt_ratio_b_x64);
+        core::mem::swap(&mut sqrt_ratio_a_x64, &mut sqrt_ratio_b_x64);
     };
 
     if sqrt_ratio_x64 <= sqrt_ratio_a_x64 {
@@ -141,7 +141,7 @@ pub fn get_liquidity_from_single_amount_1(
 ) -> u128 {
     // sqrt_ratio_a_x64 should hold the smaller value
     if sqrt_ratio_a_x64 > sqrt_ratio_b_x64 {
-        std::mem::swap(&mut sqrt_ratio_a_x64, &mut sqrt_ratio_b_x64);
+        core::mem::swap(&mut sqrt_ratio_a_x64, &mut sqrt_ratio_b_x64);
     };
 
     if sqrt_ratio_x64 <= sqrt_ratio_a_x64 {
@@ -171,7 +171,7 @@ pub fn get_delta_amount_0_unsigned(
 ) -> Result<u64> {
     // sqrt_ratio_a_x64 should hold the smaller value
     if sqrt_ratio_a_x64 > sqrt_ratio_b_x64 {
-        std::mem::swap(&mut sqrt_ratio_a_x64, &mut sqrt_ratio_b_x64);
+        core::mem::swap(&mut sqrt_ratio_a_x64, &mut sqrt_ratio_b_x64);
     };
 
     let numerator_1 = U256::from(liquidity) << fixed_point_64::RESOLUTION;
@@ -208,7 +208,7 @@ pub fn get_delta_amount_1_unsigned(
 ) -> Result<u64> {
     // sqrt_ratio_a_x64 should hold the smaller value
     if sqrt_ratio_a_x64 > sqrt_ratio_b_x64 {
-        std::mem::swap(&mut sqrt_ratio_a_x64, &mut sqrt_ratio_b_x64);
+        core::mem::swap(&mut sqrt_ratio_a_x64, &mut sqrt_ratio_b_x64);
     };
 
     let result = if round_up {

@@ -16,10 +16,23 @@ without round-tripping through the chain.
 
 ## Status
 
-`v0.1.0`. Math compiles, the published Raydium boundary constants
-(`MIN_SQRT_PRICE_X64`, `MAX_SQRT_PRICE_X64`) round-trip exactly, and the
-crate-root smoke tests pass. Mainnet historical-swap differential tests are in
-progress — assume bugs until those land.
+`v0.1.0`. The math is verified at three increasingly strict levels:
+
+- **Boundary constants.** `get_sqrt_price_at_tick(MIN_TICK)` returns
+  `MIN_SQRT_PRICE_X64` exactly, same for `MAX_TICK`, `tick=0` returns
+  `2^64`, and the round-trip `tick → sqrt_price → tick` is exact across
+  the full domain (887,272 ticks, runs in ~120ms in release mode).
+- **Property invariants** (proptest): price monotonicity in tick, swap
+  steps respect their target, fee accounting is bounded.
+- **Mainnet replay.** 17 captured Raydium SOL/USDC CLMM swaps replay
+  byte-exactly through `compute_swap_step` with multi-tick walking, on
+  both `amount_in` and `amount_out`. Coverage spans \$0.015–\$2,000 swap
+  sizes, both directions, and both `swap` and `swap_v2` instructions.
+
+Out-of-scope items (Token-2022, multi-tick `compute_swap_full`, position
+fees) are listed below; see `CHANGELOG.md` for the v0.2 roadmap and
+`docs/audits/v0.1.0-external-review.md` for an external audit of test
+coverage and peer comparison.
 
 ## Quickstart
 
@@ -71,12 +84,13 @@ on-chain implementation. The only changes are:
 
 1. Import-path rewrites (`crate::libraries::*` → crate-root paths).
 2. A small internal `ErrorCode` enum that replaces `anchor_lang::error::Error`.
-3. Free-function rehosting of three static methods (`tick_count`,
+3. Free-function rehosting of four static methods (`tick_count`,
    `get_array_start_index`, `check_is_out_of_boundary`,
    `check_is_valid_start_index`) that used no struct fields.
 
 Upstream tests (`#[cfg(test)]` blocks using `proptest` / `quickcheck`) were
-removed in favor of new tests anchored to mainnet ground-truth.
+removed in favor of new tests anchored to mainnet ground-truth, plus
+property tests on swap-step invariants.
 
 ## License
 
