@@ -35,12 +35,11 @@ fn b64(s: &str) -> Vec<u8> {
 
 #[test]
 fn pool_state_decodes_from_fixture() {
-    let Some(fx) = load_fixture() else {
-        // No fixtures yet — skip rather than fail. CI/dev workflow: run
-        // scripts/fetch_fixtures.py to generate fixtures, then re-run.
-        eprintln!("[skip] no fixtures in tests/fixtures/");
-        return;
-    };
+    let fx = load_fixture().expect(
+        "no swap_*.json fixtures in tests/fixtures/ — \
+         the committed fixture set is required for this test to be meaningful. \
+         Re-clone or run scripts/fetch_fixtures.py.",
+    );
     let pool_b64 = fx["pool_b64"].as_str().expect("pool_b64");
     let bytes = b64(pool_b64);
     let pool = PoolState::from_bytes(&bytes).expect("decode pool");
@@ -92,10 +91,10 @@ fn pool_state_decodes_from_fixture() {
 
 #[test]
 fn tick_array_decodes_from_fixture() {
-    let Some(fx) = load_fixture() else {
-        eprintln!("[skip] no fixtures in tests/fixtures/");
-        return;
-    };
+    let fx = load_fixture().expect(
+        "no swap_*.json fixtures in tests/fixtures/ — \
+         the committed fixture set is required for this test to be meaningful.",
+    );
     let pool_addr_str = fx["pool_address"].as_str().unwrap();
     // Decode pool address (base58) for pool_id verification — quick & dirty
     // base58 alphabet decode using a lookup table.

@@ -102,9 +102,18 @@ fn replay_swap(
         .collect();
     all_ticks.sort_by_key(|t| t.tick);
 
+    // Hard cap on iterations: a real CLMM swap shouldn't traverse more than a
+    // few dozen tick crossings even at the extremes. Hitting 256 means the loop
+    // is stuck (no-op step) — fail loudly so we see the proximate cause rather
+    // than a downstream amount mismatch.
     let mut steps = 0;
-    while amount_remaining > 0 && sp_current != sp_limit && steps < 256 {
+    while amount_remaining > 0 && sp_current != sp_limit {
         steps += 1;
+        assert!(
+            steps <= 256,
+            "swap exceeded 256 steps — likely infinite loop. \
+             tick={tick_current} sp={sp_current} L={liquidity} amt_rem={amount_remaining}"
+        );
 
         // Next initialized tick in swap direction.
         let next_tick_opt: Option<i32> = if zero_for_one {
@@ -231,10 +240,12 @@ fn replay_swap(
 #[test]
 fn replay_fixtures_match_observed() {
     let fixtures = load_fixtures();
-    if fixtures.is_empty() {
-        eprintln!("[skip] no fixtures — run scripts/fetch_fixtures.py first");
-        return;
-    }
+    assert!(
+        !fixtures.is_empty(),
+        "no swap_*.json fixtures in tests/fixtures/ — \
+         the committed fixture set is required for this test to be meaningful. \
+         Re-clone or run scripts/fetch_fixtures.py to regenerate."
+    );
     let meta = load_metadata();
     let fee_rate_ppm: u32 = (meta["fee_rate"].as_f64().unwrap() * 1_000_000.0).round() as u32;
 
