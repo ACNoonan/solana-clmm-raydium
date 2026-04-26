@@ -47,8 +47,8 @@ solana-clmm-raydium = "0.1"
   both `amount_in` and `amount_out`. Coverage spans \$0.015–\$2,000 swap
   sizes, both directions, and both `swap` and `swap_v2` instructions.
 
-Out-of-scope items (Token-2022, multi-tick `compute_swap_full`, position
-fees) are listed below; see `CHANGELOG.md` for the v0.2 roadmap and
+Out-of-scope items (multi-tick `compute_swap_full`, position fees) are
+listed below; see `CHANGELOG.md` for the v0.2 roadmap and
 `docs/audits/v0.1.0-external-review.md` for an external audit of test
 coverage and peer comparison.
 
@@ -80,17 +80,44 @@ let step = compute_swap_step(
 )?;
 ```
 
+### Token-2022 transfer fees
+
+For pools with a Token-2022 mint that has the `TransferFeeConfig`
+extension, wrap the swap step with `apply_transfer_fee` on the input and
+on the output. Caller resolves the active fee for the current epoch.
+
+```rust
+use solana_clmm_raydium::{
+    apply_transfer_fee, compute_swap_step, reverse_apply_transfer_fee, TransferFee,
+};
+
+let fee_in  = TransferFee { transfer_fee_basis_points: 30, maximum_fee: 1_000_000 };
+let fee_out = TransferFee { transfer_fee_basis_points:  0, maximum_fee: 0         };
+
+// Exact-in: pool sees the user's amount minus the input-side transfer fee.
+let pool_amount_in = apply_transfer_fee(&fee_in, user_amount_in)?;
+let step = compute_swap_step(/* …, */ pool_amount_in, /* …, */ true, /* … */)?;
+let user_amount_out = apply_transfer_fee(&fee_out, step.amount_out)?;
+
+// Exact-out: invert to size the swap so the user lands at `target_out`.
+let pool_amount_out = reverse_apply_transfer_fee(&fee_out, target_out)?;
+```
+
+
 ## Scope
 
 **In scope.** Tick ↔ sqrt-price, liquidity ↔ token-amount, single-tick swap
-step, tick-array bitmap navigation. See the
-[crate-level docs](src/lib.rs) for the full curated public API.
+step, tick-array bitmap navigation, Token-2022 transfer-fee math
+(byte-exact mirror of `spl_token_2022_interface::extension::transfer_fee`).
+See the [crate-level docs](src/lib.rs) for the full curated public API.
 
 **Out of scope.**
 - Pool / tick-array account decoding — this crate takes pre-decoded state.
 - Multi-tick `compute_swap_full` orchestration — composing it requires fetching
   tick-array accounts at runtime; that is the consumer's job.
-- Token-2022 transfer-fee / transfer-hook accounting.
+- Token-2022 mint-extension TLV decoding and transfer-hook execution —
+  caller resolves the active `TransferFee` for the current epoch and
+  CPIs hook programs.
 - Position fee and reward accumulation beyond `liquidity_from_amounts`.
 
 ## Provenance

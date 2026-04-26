@@ -21,13 +21,17 @@
 //! - Single-tick swap step ([`compute_swap_step`])
 //! - Tick-array bitmap navigation
 //!   ([`next_initialized_tick_array_start_index`])
+//! - Token-2022 transfer-fee math ([`calculate_fee`],
+//!   [`apply_transfer_fee`], [`reverse_apply_transfer_fee`]) — mirrors
+//!   `spl_token_2022_interface::extension::transfer_fee` byte-exactly
 //!
 //! # Out of scope
 //!
 //! - Pool / tick-array account decoding (this crate takes pre-decoded state)
 //! - Multi-tick `compute_swap_full` (composing it requires fetching tick-array
 //!   accounts; that is the consumer's responsibility)
-//! - Token-2022 transfer-fee / transfer-hook accounting
+//! - Token-2022 mint-extension TLV decoding and transfer-hook execution
+//!   (caller resolves the active [`TransferFee`] and CPIs hook programs)
 //! - Position fee and reward accumulation beyond `liquidity_from_amounts`
 //!
 //! # Provenance
@@ -58,6 +62,7 @@ pub mod state_helpers;
 pub mod swap_math;
 pub mod tick_array_bit_map;
 pub mod tick_math;
+pub mod transfer_fee;
 
 // ---- curated public API ----
 
@@ -81,4 +86,9 @@ pub use tick_array_bit_map::{next_initialized_tick_array_start_index, TICK_ARRAY
 pub use state_helpers::{
     array_start_index_for_tick, is_tick_out_of_boundary, is_valid_tick_array_start_index,
     tick_count_in_array, FEE_RATE_DENOMINATOR_VALUE, TICK_ARRAY_SIZE,
+};
+
+pub use transfer_fee::{
+    apply_transfer_fee, calculate_fee, reverse_apply_transfer_fee, TransferFee,
+    MAX_FEE_BASIS_POINTS,
 };

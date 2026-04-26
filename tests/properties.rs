@@ -1,7 +1,8 @@
 use proptest::prelude::*;
 use solana_clmm_raydium::{
-    compute_swap_step, get_sqrt_price_at_tick, get_tick_at_sqrt_price, FEE_RATE_DENOMINATOR_VALUE,
-    MAX_SQRT_PRICE_X64, MAX_TICK, MIN_SQRT_PRICE_X64, MIN_TICK,
+    apply_transfer_fee, calculate_fee, compute_swap_step, get_sqrt_price_at_tick,
+    get_tick_at_sqrt_price, reverse_apply_transfer_fee, TransferFee, FEE_RATE_DENOMINATOR_VALUE,
+    MAX_FEE_BASIS_POINTS, MAX_SQRT_PRICE_X64, MAX_TICK, MIN_SQRT_PRICE_X64, MIN_TICK,
 };
 
 // ---- tick <-> sqrt_price ----
@@ -177,5 +178,67 @@ proptest! {
         let upper = sqrt_price_current_x64.max(sqrt_price_target_x64);
         prop_assert!(step.sqrt_price_next_x64 >= lower);
         prop_assert!(step.sqrt_price_next_x64 <= upper);
+    }
+}
+
+// ---- Token-2022 transfer fee ----
+//
+// These mirror the proptests in
+// `spl_token_2022_interface::extension::transfer_fee::tests`. If `transfer_fee`
+// drifts from the on-chain Token-2022 implementation, these will catch it.
+
+proptest! {
+    /// `apply_transfer_fee` is exactly `pre - calculate_fee(pre)` and never
+    /// underflows.
+    #[test]
+    fn transfer_fee_apply_is_subtraction(
+        bps in 0u16..=MAX_FEE_BASIS_POINTS,
+        maximum_fee in any::<u64>(),
+        amount in any::<u64>(),
+    ) {
+        let f = TransferFee { transfer_fee_basis_points: bps, maximum_fee };
+        let fee = calculate_fee(&f, amount).expect("u64-bounded");
+        let post = apply_transfer_fee(&f, amount).expect("u64-bounded");
+        prop_assert_eq!(post + fee, amount);
+        prop_assert!(fee <= maximum_fee);
+    }
+
+    /// Documented Token-2022 invariant
+    /// (`spl_token_2022_interface` `inverse_fee_relationship`):
+    /// `calculate_fee(reverse_apply(post)) <= calculate_fee(pre)` for any
+    /// `pre` with `apply(pre) == post`. Fee round-up means the reverse can
+    /// land one base unit short of the original pre-fee amount.
+    #[test]
+    fn transfer_fee_inverse_inequality(
+        bps in 0u16..MAX_FEE_BASIS_POINTS,
+        maximum_fee in any::<u64>(),
+        amount_in in any::<u64>(),
+    ) {
+        let f = TransferFee { transfer_fee_basis_points: bps, maximum_fee };
+        let fee = calculate_fee(&f, amount_in).expect("u64-bounded");
+        let amount_out = amount_in - fee;
+        let pre = reverse_apply_transfer_fee(&f, amount_out).expect("u64-bounded");
+        let fee_inv = calculate_fee(&f, pre).expect("u64-bounded");
+        prop_assert!(fee >= fee_inv, "fee={} fee_inv={}", fee, fee_inv);
+    }
+
+    /// Whenever a `pre_fee_amount` exists, `apply(reverse(post)) >= post` —
+    /// i.e. exact-out routing never under-sizes the input.
+    /// (For some `(bps, max_fee, post)` no `u64` pre-fee exists; the function
+    /// returns `Err` there, which is the correct boundary behavior, so we
+    /// `prop_assume!` past those samples.)
+    #[test]
+    fn transfer_fee_round_trip_post_amount_lower_bound(
+        bps in 0u16..MAX_FEE_BASIS_POINTS,
+        maximum_fee in any::<u64>(),
+        post in any::<u64>(),
+    ) {
+        let f = TransferFee { transfer_fee_basis_points: bps, maximum_fee };
+        let pre = match reverse_apply_transfer_fee(&f, post) {
+            Ok(v) => v,
+            Err(_) => return Ok(()), // no representable pre_fee_amount
+        };
+        let recovered = apply_transfer_fee(&f, pre).expect("apply on valid pre");
+        prop_assert!(recovered >= post, "pre={} recovered={} post={}", pre, recovered, post);
     }
 }

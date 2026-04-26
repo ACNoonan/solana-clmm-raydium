@@ -7,6 +7,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- **Token-2022 transfer-fee math** (`transfer_fee` module). New public API:
+  `TransferFee`, `calculate_fee`, `apply_transfer_fee`,
+  `reverse_apply_transfer_fee`, `MAX_FEE_BASIS_POINTS`. Mirrors
+  `spl_token_2022_interface::extension::transfer_fee` byte-exactly,
+  including all boundary cases (cap, 100% fee, ceil-rounding) and the
+  documented round-trip inequality for exact-out routing. Test vectors
+  ported verbatim from the spl reference suite.
+
+### Changed
+- `Out of scope` narrowed: Token-2022 transfer-fee math is now in scope;
+  mint-extension TLV decoding and transfer-hook CPI remain out of scope
+  (caller resolves the active fee for the current epoch).
+
 ## [0.1.0] — 2026-04-26
 
 Initial release. Pure-Rust, no-RPC swap math for the Raydium concentrated-
@@ -42,7 +56,8 @@ liquidity AMM (CLMM) on Solana, extracted byte-for-byte from
 - Pool / tick-array account decoding (this crate takes pre-decoded state).
 - Multi-tick `compute_swap_full` orchestration (composing the primitive
   requires fetching tick-array accounts; that is the consumer's job).
-- Token-2022 transfer-fee / transfer-hook accounting.
+- Token-2022 mint-extension TLV decoding and transfer-hook CPI (the
+  transfer-fee math itself ships in 0.2).
 - Position fee / reward accumulation beyond `liquidity_from_amounts`.
 - Litesvm differential test (replays against a forked program).
 
