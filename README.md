@@ -1,5 +1,10 @@
 # solana-clmm-raydium
 
+[![crates.io](https://img.shields.io/crates/v/solana-clmm-raydium.svg)](https://crates.io/crates/solana-clmm-raydium)
+[![docs.rs](https://img.shields.io/docsrs/solana-clmm-raydium)](https://docs.rs/solana-clmm-raydium)
+[![CI](https://github.com/ACNoonan/solana-clmm-raydium/actions/workflows/ci.yml/badge.svg)](https://github.com/ACNoonan/solana-clmm-raydium/actions/workflows/ci.yml)
+[![License: MIT OR Apache-2.0](https://img.shields.io/crates/l/solana-clmm-raydium.svg)](#license)
+
 Pure-Rust, no-RPC swap math for the [Raydium](https://github.com/raydium-io/raydium-clmm)
 concentrated-liquidity AMM (CLMM) on Solana.
 
@@ -13,6 +18,19 @@ It is the missing analogue of [`uniswap_v3_math`](https://crates.io/crates/unisw
 for Solana CLMMs. Use it for backtesting, simulation, MEV/LVR research, route
 finding, or anywhere you want to know the exact swap output of a Raydium pool
 without round-tripping through the chain.
+
+## Install
+
+```bash
+cargo add solana-clmm-raydium
+```
+
+Or in `Cargo.toml`:
+
+```toml
+[dependencies]
+solana-clmm-raydium = "0.1"
+```
 
 ## Status
 
