@@ -21,3 +21,12 @@ uint = { version = "0.9", default-features = false }
 proptest = "1"
 serde_json = "1"
 base64 = "0.22"
+# Differential testing only — locks `transfer_fee` byte-exact parity with
+# the canonical spl-token-2022 implementation. Pulls a chunk of the
+# solana-* crate graph; never reaches the published artifact (dev-deps
+# are invisible to consumers).
+spl-token-2022-interface = "2"
+# Constructors for `PodU16` / `PodU64`, the field types of upstream
+# `TransferFee`. Already in the spl-token-2022-interface graph; named here
+# explicitly so we can construct test fixtures.
+spl-pod = "0.7"

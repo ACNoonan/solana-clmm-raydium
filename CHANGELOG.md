@@ -15,11 +15,34 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   including all boundary cases (cap, 100% fee, ceil-rounding) and the
   documented round-trip inequality for exact-out routing. Test vectors
   ported verbatim from the spl reference suite.
+- **Differential proptest** (`tests/transfer_fee_diff.rs`): runs our
+  `calculate_fee` / `apply_transfer_fee` / `reverse_apply_transfer_fee`
+  side-by-side with the upstream `spl_token_2022_interface`
+  implementation across 4096 cases each per function. Locks parity even
+  if upstream patches its math; flags drift on the next dev build.
+- **End-to-end wiring test** (`tests/transfer_fee_swap.rs`): six tests
+  composing `apply_transfer_fee` → `compute_swap_step` →
+  `apply_transfer_fee` against a synthetic pool, asserting the
+  zero-fee identity, expected withheld amounts on input and output
+  sides, cap-dominates behavior, and exact-out round-trip via
+  `reverse_apply_transfer_fee`. Catches double-application and
+  ordering bugs without RPC.
 
 ### Changed
 - `Out of scope` narrowed: Token-2022 transfer-fee math is now in scope;
   mint-extension TLV decoding and transfer-hook CPI remain out of scope
   (caller resolves the active fee for the current epoch).
+
+### Notes
+- **Mainnet replay for transfer-fee swaps is not shipped in this revision**
+  by empirical necessity. A scan of the top 500 Raydium CLMM pools by 24h
+  volume finds 90 with at least one Token-2022 mint, but only three have
+  a `TransferFeeConfig` extension *without* a non-replayable
+  `TransferHook` (`WSOL/LAUNCHCOIN`, `SEAS/USDC`, `WSOL/SOS`, all under
+  $10k/day in volume). The high-volume Token-2022 mints (HRP, TrumpPepe,
+  WCOR, …) carry no extensions and behave identically to SPL Token, so
+  replaying them adds no signal. Math parity is locked via the
+  differential proptest; the wiring test covers composition.
 
 ## [0.1.0] — 2026-04-26
 
