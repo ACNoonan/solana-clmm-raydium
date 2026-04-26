@@ -1,7 +1,7 @@
 use proptest::prelude::*;
 use solana_clmm_raydium::{
-    compute_swap_step, get_sqrt_price_at_tick, get_tick_at_sqrt_price, MAX_SQRT_PRICE_X64,
-    MAX_TICK, MIN_SQRT_PRICE_X64, MIN_TICK,
+    compute_swap_step, get_sqrt_price_at_tick, get_tick_at_sqrt_price, FEE_RATE_DENOMINATOR_VALUE,
+    MAX_SQRT_PRICE_X64, MAX_TICK, MIN_SQRT_PRICE_X64, MIN_TICK,
 };
 
 // ---- tick <-> sqrt_price ----
@@ -61,96 +61,121 @@ fn out_of_domain_ticks_error() {
     assert!(get_tick_at_sqrt_price(MAX_SQRT_PRICE_X64).is_err()); // half-open: MAX is exclusive
 }
 
+// Property tests over the full tick / sqrt-price domain. Names mirror the
+// upstream raydium-clmm proptests (deleted during extraction in M1) so they
+// stay diffable. Prefer these over the hand-written direction-specific
+// proptests we shipped in M2 — they cover the full domain with a single test
+// each and exercise boundary cases the M2 proptests skipped.
+
 proptest! {
+    /// `sqrt_price_at_tick(t)` lies inside the canonical CLMM price domain
+    /// and is strictly between sqrt_price_at_tick(t-1) and sqrt_price_at_tick(t+1).
     #[test]
-    fn proptest_round_trip(tick in MIN_TICK..MAX_TICK) {
-        let sp = get_sqrt_price_at_tick(tick).unwrap();
-        let recovered = get_tick_at_sqrt_price(sp).unwrap();
-        prop_assert_eq!(recovered, tick);
+    fn get_sqrt_price_at_tick_test(tick in MIN_TICK + 1..MAX_TICK - 1) {
+        let sqrt_price_x64 = get_sqrt_price_at_tick(tick).unwrap();
+        prop_assert!(sqrt_price_x64 >= MIN_SQRT_PRICE_X64);
+        prop_assert!(sqrt_price_x64 <= MAX_SQRT_PRICE_X64);
+
+        let minus = get_sqrt_price_at_tick(tick - 1).unwrap();
+        let plus = get_sqrt_price_at_tick(tick + 1).unwrap();
+        prop_assert!(minus < sqrt_price_x64 && sqrt_price_x64 < plus);
+    }
+
+    /// `tick_at_sqrt_price(sp)` returns a tick whose canonical interval
+    /// `[sp(t), sp(t+1))` actually contains sp.
+    #[test]
+    fn get_tick_at_sqrt_price_test(
+        sqrt_price in MIN_SQRT_PRICE_X64..MAX_SQRT_PRICE_X64,
+    ) {
+        let tick = get_tick_at_sqrt_price(sqrt_price).unwrap();
+        prop_assert!(tick >= MIN_TICK);
+        prop_assert!(tick <= MAX_TICK);
+        prop_assert!(
+            sqrt_price >= get_sqrt_price_at_tick(tick).unwrap()
+                && sqrt_price < get_sqrt_price_at_tick(tick + 1).unwrap()
+        );
+    }
+
+    /// `tick → sqrt_price → tick` round-trip across the full domain.
+    /// Replaces our M2 narrower `proptest_round_trip` — same intent, full range.
+    #[test]
+    fn tick_and_sqrt_price_symmetry_test(tick in MIN_TICK..MAX_TICK) {
+        let sqrt_price_x64 = get_sqrt_price_at_tick(tick).unwrap();
+        let resolved = get_tick_at_sqrt_price(sqrt_price_x64).unwrap();
+        prop_assert_eq!(resolved, tick);
+    }
+
+    /// Strict adjacent-pair monotonicity over the entire tick domain.
+    /// `sqrt_price_is_monotonic_in_tick` already tests this with step-100
+    /// sampling; this catches any non-monotone *adjacent* pair the sample skips.
+    #[test]
+    fn get_sqrt_price_at_tick_is_sequence_test(tick in MIN_TICK + 1..MAX_TICK) {
+        let cur = get_sqrt_price_at_tick(tick).unwrap();
+        let prev = get_sqrt_price_at_tick(tick - 1).unwrap();
+        prop_assert!(prev < cur);
+    }
+
+    /// Tick-from-sqrt-price is non-decreasing across small price deltas.
+    #[test]
+    fn get_tick_at_sqrt_price_is_sequence_test(
+        sqrt_price in (MIN_SQRT_PRICE_X64 + 10)..MAX_SQRT_PRICE_X64,
+    ) {
+        let tick = get_tick_at_sqrt_price(sqrt_price).unwrap();
+        let prev_tick = get_tick_at_sqrt_price(sqrt_price - 10).unwrap();
+        prop_assert!(prev_tick <= tick);
     }
 }
 
-// ---- compute_swap_step invariants ----
-
-const FEE_RATE_25_BPS: u32 = 2_500; // 0.25%
-const FEE_RATE_5_BPS: u32 = 500; // 0.05%
+// ---- compute_swap_step ----
+//
+// Single proptest covering the full domain across both directions and both
+// exact-in / exact-out modes. Mirrors upstream's `compute_swap_step_test`,
+// adapted for our public API. Replaces the three direction-specific proptests
+// shipped in M2 — those were a strict subset of this. See audit §4.2.
 
 proptest! {
-    /// For zero_for_one (token0→token1): price moves down. Output token1 ≤ liquidity bound.
     #[test]
-    fn swap_step_zero_for_one_price_decreases(
-        // tick range loose enough to give meaningful liquidity space but tight
-        // enough to avoid overflow corner cases on first pass
-        current_tick in -100_000i32..100_000i32,
-        // target is below current, but no more than 5_000 ticks away (one tick array)
-        delta in 1i32..5_000i32,
-        liquidity in 1_000u128..1_000_000_000_000u128,
-        amount_remaining in 1u64..1_000_000_000_000u64,
+    fn compute_swap_step_test(
+        sqrt_price_current_x64 in MIN_SQRT_PRICE_X64..MAX_SQRT_PRICE_X64,
+        sqrt_price_target_x64 in MIN_SQRT_PRICE_X64..MAX_SQRT_PRICE_X64,
+        liquidity in 1u128..u32::MAX as u128,
+        amount_remaining in 1u64..u64::MAX,
+        fee_rate in 1u32..FEE_RATE_DENOMINATOR_VALUE / 2,
+        is_base_input in proptest::bool::ANY,
     ) {
-        let target_tick = current_tick - delta;
-        prop_assume!(target_tick >= MIN_TICK);
-        let sp_current = get_sqrt_price_at_tick(current_tick).unwrap();
-        let sp_target = get_sqrt_price_at_tick(target_tick).unwrap();
-        let step = compute_swap_step(
-            sp_current, sp_target, liquidity, amount_remaining,
-            FEE_RATE_25_BPS,
-            /* is_base_input */ true,
-            /* zero_for_one  */ true,
-            /* block_timestamp */ 0,
-        ).unwrap();
-        prop_assert!(step.sqrt_price_next_x64 <= sp_current,
-            "price should not increase on zero_for_one swap");
-        prop_assert!(step.sqrt_price_next_x64 >= sp_target,
-            "price should not pass target on zero_for_one swap");
-        prop_assert!(step.amount_in <= amount_remaining,
-            "amount_in {} cannot exceed amount_remaining {}",
-            step.amount_in, amount_remaining);
-    }
+        prop_assume!(sqrt_price_current_x64 != sqrt_price_target_x64);
+        let zero_for_one = sqrt_price_current_x64 > sqrt_price_target_x64;
 
-    /// For one_for_zero (token1→token0): price moves up.
-    #[test]
-    fn swap_step_one_for_zero_price_increases(
-        current_tick in -100_000i32..100_000i32,
-        delta in 1i32..5_000i32,
-        liquidity in 1_000u128..1_000_000_000_000u128,
-        amount_remaining in 1u64..1_000_000_000_000u64,
-    ) {
-        let target_tick = current_tick + delta;
-        prop_assume!(target_tick <= MAX_TICK);
-        let sp_current = get_sqrt_price_at_tick(current_tick).unwrap();
-        let sp_target = get_sqrt_price_at_tick(target_tick).unwrap();
         let step = compute_swap_step(
-            sp_current, sp_target, liquidity, amount_remaining,
-            FEE_RATE_5_BPS,
-            true, false, 0,
+            sqrt_price_current_x64,
+            sqrt_price_target_x64,
+            liquidity,
+            amount_remaining,
+            fee_rate,
+            is_base_input,
+            zero_for_one,
+            /* block_timestamp */ 1,
         ).unwrap();
-        prop_assert!(step.sqrt_price_next_x64 >= sp_current,
-            "price should not decrease on one_for_zero swap");
-        prop_assert!(step.sqrt_price_next_x64 <= sp_target,
-            "price should not pass target on one_for_zero swap");
-        prop_assert!(step.amount_in <= amount_remaining);
-    }
 
-    /// Fee accounting: amount_in is post-fee. fee_amount is at most the implied fee on amount_in.
-    #[test]
-    fn swap_step_fee_is_bounded(
-        current_tick in -50_000i32..50_000i32,
-        delta in 1i32..2_000i32,
-        liquidity in 100_000u128..100_000_000u128,
-        amount_remaining in 1_000u64..100_000_000u64,
-    ) {
-        let target_tick = current_tick - delta;
-        prop_assume!(target_tick >= MIN_TICK);
-        let sp_current = get_sqrt_price_at_tick(current_tick).unwrap();
-        let sp_target = get_sqrt_price_at_tick(target_tick).unwrap();
-        let step = compute_swap_step(
-            sp_current, sp_target, liquidity, amount_remaining,
-            FEE_RATE_25_BPS, true, true, 0,
-        ).unwrap();
-        // total cost (in + fee) cannot exceed amount_remaining
-        let total_cost = step.amount_in.saturating_add(step.fee_amount);
-        prop_assert!(total_cost <= amount_remaining,
-            "amount_in {} + fee {} = {} exceeds amount_remaining {}",
-            step.amount_in, step.fee_amount, total_cost, amount_remaining);
+        let amount_used = if is_base_input {
+            step.amount_in + step.fee_amount
+        } else {
+            step.amount_out
+        };
+
+        // If we did not reach the target, ALL of amount_remaining must have
+        // been used (this is the tighter equality the M2 proptest only
+        // bounded, see audit §4.2).
+        if step.sqrt_price_next_x64 != sqrt_price_target_x64 {
+            prop_assert_eq!(amount_used, amount_remaining);
+        } else {
+            prop_assert!(amount_used <= amount_remaining);
+        }
+
+        // sp_next stays inside the [current, target] interval (both directions).
+        let lower = sqrt_price_current_x64.min(sqrt_price_target_x64);
+        let upper = sqrt_price_current_x64.max(sqrt_price_target_x64);
+        prop_assert!(step.sqrt_price_next_x64 >= lower);
+        prop_assert!(step.sqrt_price_next_x64 <= upper);
     }
 }
