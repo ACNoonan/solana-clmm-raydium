@@ -1,0 +1,23 @@
+[package]
+name = "solana-clmm-raydium"
+version = "0.1.0"
+edition = "2021"
+rust-version = "1.75"
+license = "MIT OR Apache-2.0"
+description = "Pure-Rust, no-RPC swap math for the Raydium concentrated-liquidity AMM (CLMM) on Solana. Extracted from the on-chain program with no Anchor / solana-program / runtime dependencies."
+keywords = ["solana", "raydium", "clmm", "amm", "defi"]
+categories = ["finance", "mathematics", "no-std"]
+readme = "README.md"
+repository = "https://github.com/ACNoonan/solana-clmm-raydium"
+documentation = "https://docs.rs/solana-clmm-raydium"
+
+[lib]
+doctest = false
+
+[dependencies]
+uint = { version = "0.9", default-features = false }
+
+[dev-dependencies]
+proptest = "1"
+serde_json = "1"
+base64 = "0.22"

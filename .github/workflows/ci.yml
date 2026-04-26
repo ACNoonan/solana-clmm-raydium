@@ -1,0 +1,35 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  test:
+    name: cargo test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - run: cargo build --verbose
+      - run: cargo test --verbose
+      - name: Exhaustive 887k-tick round-trip
+        run: cargo test --release --test properties -- --ignored tick_round_trip_exhaustive
+
+  lints:
+    name: clippy + rustfmt
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy, rustfmt
+      - uses: Swatinem/rust-cache@v2
+      - run: cargo fmt --all -- --check
+      # Math modules are extracted byte-for-byte from raydium-clmm so we keep
+      # them lint-permissive to remain diffable against upstream. We deny
+      # warnings on tests (our own code) but only collect them on the lib.
+      - run: cargo clippy --tests -- -D warnings
+      - run: cargo clippy --lib
