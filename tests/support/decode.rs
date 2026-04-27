@@ -30,6 +30,15 @@ const REWARD_INFO_LEN: usize = 1 + 8 + 8 + 8 + 16 + 8 + 8 + 32 + 32 + 32 + 16; /
 // + 169 * 3          reward_infos
 // + 8 * 16           tick_array_bitmap
 
+// Pubkey field offsets (used by litesvm test to synthesize matching accounts).
+const OFF_AMM_CONFIG: usize = ANCHOR_DISC + 1; // 9
+const OFF_MINT_0: usize = ANCHOR_DISC + 1 + PUBKEY * 2; // 73
+const OFF_MINT_1: usize = OFF_MINT_0 + PUBKEY; // 105
+const OFF_VAULT_0: usize = OFF_MINT_1 + PUBKEY; // 137
+const OFF_VAULT_1: usize = OFF_VAULT_0 + PUBKEY; // 169
+const OFF_OBSERVATION_KEY: usize = OFF_VAULT_1 + PUBKEY; // 201
+const OFF_MINT_DECIMALS_0: usize = ANCHOR_DISC + 1 + PUBKEY * 7; // 233
+const OFF_MINT_DECIMALS_1: usize = OFF_MINT_DECIMALS_0 + 1; // 234
 const OFF_TICK_SPACING: usize = ANCHOR_DISC + 1 + PUBKEY * 7 + 2; // 235
 const OFF_LIQUIDITY: usize = OFF_TICK_SPACING + 2; // 237
 const OFF_SQRT_PRICE: usize = OFF_LIQUIDITY + 16; // 253
@@ -48,6 +57,17 @@ const POOL_MIN_LEN: usize = OFF_TICK_ARRAY_BITMAP + 8 * 16; // 1032
 #[allow(dead_code)] // fields read by replay.rs; cargo dead-code analysis can't see across test binaries cleanly
 #[derive(Debug, Clone)]
 pub struct PoolState {
+    // Pubkeys (used by litesvm_diff to synthesize matching support accounts).
+    pub amm_config: [u8; 32],
+    pub mint_0: [u8; 32],
+    pub mint_1: [u8; 32],
+    pub vault_0: [u8; 32],
+    pub vault_1: [u8; 32],
+    pub observation_key: [u8; 32],
+    // Decimals (need matching SPL mint accounts).
+    pub mint_decimals_0: u8,
+    pub mint_decimals_1: u8,
+    // Swap-math fields.
     pub tick_spacing: u16,
     pub liquidity: u128,
     pub sqrt_price_x64: u128,
@@ -69,7 +89,16 @@ impl PoolState {
             let off = OFF_TICK_ARRAY_BITMAP + i * 8;
             *slot = u64::from_le_bytes(d[off..off + 8].try_into().unwrap());
         }
+        let pk = |off: usize| -> [u8; 32] { d[off..off + PUBKEY].try_into().unwrap() };
         Ok(Self {
+            amm_config: pk(OFF_AMM_CONFIG),
+            mint_0: pk(OFF_MINT_0),
+            mint_1: pk(OFF_MINT_1),
+            vault_0: pk(OFF_VAULT_0),
+            vault_1: pk(OFF_VAULT_1),
+            observation_key: pk(OFF_OBSERVATION_KEY),
+            mint_decimals_0: d[OFF_MINT_DECIMALS_0],
+            mint_decimals_1: d[OFF_MINT_DECIMALS_1],
             tick_spacing: u16::from_le_bytes(
                 d[OFF_TICK_SPACING..OFF_TICK_SPACING + 2]
                     .try_into()
