@@ -73,7 +73,6 @@ fn replay_swap(
     is_base_input: bool,
     zero_for_one: bool,
     fee_rate_ppm: u32,
-    block_timestamp: u32,
 ) -> ReplayOut {
     let mut sp_current = pool.sqrt_price_x64;
     let mut tick_current = pool.tick_current;
@@ -169,7 +168,6 @@ fn replay_swap(
             fee_rate_ppm,
             is_base_input,
             zero_for_one,
-            block_timestamp,
         )
         .unwrap();
         if std::env::var("REPLAY_TRACE").is_ok() {
@@ -266,7 +264,6 @@ fn replay_fixtures_match_observed() {
         let amount = swap["amount"].as_u64().unwrap();
         let is_base_input = swap["is_base_input"].as_bool().unwrap();
         let zero_for_one = swap["zero_for_one"].as_bool().unwrap();
-        let block_time = swap["block_time"].as_u64().unwrap_or(0) as u32;
         let observed_in = swap["observed_amount_in"].as_u64().unwrap();
         let observed_out = swap["observed_amount_out"].as_u64().unwrap();
         let user_limit: u128 = swap["sqrt_price_limit_x64"]
@@ -283,7 +280,6 @@ fn replay_fixtures_match_observed() {
             is_base_input,
             zero_for_one,
             fee_rate_ppm,
-            block_time,
         );
 
         let name = path.file_name().unwrap().to_string_lossy().to_string();

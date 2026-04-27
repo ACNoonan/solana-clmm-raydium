@@ -10,6 +10,39 @@ pub const TICK_ARRAY_BITMAP_SIZE: i32 = 512;
 
 pub type TickArryBitmap = [u64; 8];
 
+/// Pool's tick-array bitmap as 1024 bits packed into 16 little-endian u64
+/// limbs. Bit `i` lives in `limbs[i / 64]` at position `i % 64`. Bit 512
+/// represents `tick_array_start_index = 0`; bit `512 + k` represents
+/// `start_index = +k * tick_spacing * TICK_ARRAY_SIZE`; bit `512 - k`
+/// represents the corresponding negative.
+///
+/// Decode from `pool.tick_array_bitmap` (raw `[u64; 16]` on-chain). This
+/// type's only purpose is to keep the internal `U1024` big-int out of
+/// the public API surface (issue #4).
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub struct PoolTickBitmap(pub [u64; 16]);
+
+impl PoolTickBitmap {
+    /// All zeros — no tick-arrays initialized.
+    pub const EMPTY: Self = Self([0u64; 16]);
+
+    /// Construct from raw on-chain limb layout.
+    pub const fn new(limbs: [u64; 16]) -> Self {
+        Self(limbs)
+    }
+
+    /// Borrow the underlying limbs.
+    pub const fn limbs(&self) -> &[u64; 16] {
+        &self.0
+    }
+}
+
+impl From<[u64; 16]> for PoolTickBitmap {
+    fn from(limbs: [u64; 16]) -> Self {
+        Self(limbs)
+    }
+}
+
 pub fn max_tick_in_tickarray_bitmap(tick_spacing: u16) -> i32 {
     i32::from(tick_spacing) * TICK_ARRAY_SIZE * TICK_ARRAY_BITMAP_SIZE
 }
@@ -48,10 +81,11 @@ pub fn least_significant_bit(x: U1024) -> Option<u16> {
 /// Note: The caller of the function should ensure that tick_current is within the range represented by bit_map.
 /// Currently, this function is only called when `bit_map = pool.tick_array_bitmap`.
 pub fn check_current_tick_array_is_initialized(
-    bit_map: U1024,
+    bit_map: &PoolTickBitmap,
     tick_current: i32,
     tick_spacing: u16,
 ) -> Result<(bool, i32)> {
+    let bit_map = U1024(bit_map.0);
     if is_tick_out_of_boundary(tick_current) {
         return err!(ErrorCode::InvalidTickIndex);
     }
@@ -76,11 +110,12 @@ pub fn check_current_tick_array_is_initialized(
 
 /// The function is only called when `bit_map = pool.tick_array_bitmap`.
 pub fn next_initialized_tick_array_start_index(
-    bit_map: U1024,
+    bit_map: &PoolTickBitmap,
     last_tick_array_start_index: i32,
     tick_spacing: u16,
     zero_for_one: bool,
 ) -> (bool, i32) {
+    let bit_map = U1024(bit_map.0);
     assert!(is_valid_tick_array_start_index(
         last_tick_array_start_index,
         tick_spacing

@@ -22,7 +22,6 @@ pub fn compute_swap_step(
     fee_rate: u32,
     is_base_input: bool,
     zero_for_one: bool,
-    block_timestamp: u32,
 ) -> Result<SwapStep> {
     // let exact_in = amount_remaining >= 0;
     let mut swap_step = SwapStep::default();
@@ -42,7 +41,6 @@ pub fn compute_swap_step(
             liquidity,
             zero_for_one,
             is_base_input,
-            block_timestamp,
         )?;
         if amount_in.is_some() {
             swap_step.amount_in = amount_in.unwrap();
@@ -66,7 +64,6 @@ pub fn compute_swap_step(
             liquidity,
             zero_for_one,
             is_base_input,
-            block_timestamp,
         )?;
         if amount_out.is_some() {
             swap_step.amount_out = amount_out.unwrap();
@@ -161,7 +158,6 @@ fn calculate_amount_in_range(
     liquidity: u128,
     zero_for_one: bool,
     is_base_input: bool,
-    _block_timestamp: u32,
 ) -> Result<Option<u64>> {
     if is_base_input {
         let result = if zero_for_one {

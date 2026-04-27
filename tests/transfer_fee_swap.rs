@@ -53,7 +53,6 @@ fn swap_with_fees(fee_in: TransferFee, fee_out: TransferFee) -> (SwapStep, u64, 
         POOL_FEE_PPM,
         /* is_base_input */ true,
         /* zero_for_one  */ false,
-        /* block_timestamp */ 0,
     )
     .unwrap();
     let user_amount_out = apply_transfer_fee(&fee_out, step.amount_out).unwrap();

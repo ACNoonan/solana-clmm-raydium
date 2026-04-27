@@ -155,7 +155,6 @@ proptest! {
             fee_rate,
             is_base_input,
             zero_for_one,
-            /* block_timestamp */ 1,
         ).unwrap();
 
         let amount_used = if is_base_input {

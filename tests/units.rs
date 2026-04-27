@@ -11,11 +11,10 @@
 //! Tests assert specific values rather than printing-and-walking like the
 //! upstream tests we deleted in M1.
 
-use solana_clmm_raydium::big_num::U1024;
 use solana_clmm_raydium::{
     add_delta, get_delta_amount_0_unsigned, get_delta_amount_1_unsigned,
     get_liquidity_from_amounts, get_sqrt_price_at_tick, next_initialized_tick_array_start_index,
-    ErrorCode, TICK_ARRAY_SIZE,
+    ErrorCode, PoolTickBitmap, TICK_ARRAY_SIZE,
 };
 
 // ---- next_initialized_tick_array_start_index ----
@@ -28,21 +27,24 @@ use solana_clmm_raydium::{
 //
 // where multiplier = tick_spacing * TICK_ARRAY_SIZE (= 60 * tick_spacing).
 //
-// The U1024 stores 1024 bits across 16 u64 limbs in little-endian order:
-// bit i lives in `limbs[i / 64]` at position `i % 64`.
+// `PoolTickBitmap` stores 1024 bits across 16 u64 limbs in little-endian
+// order: bit i lives in `limbs[i / 64]` at position `i % 64`.
 
 const SPACING: u16 = 10;
 const MULTIPLIER: i32 = SPACING as i32 * TICK_ARRAY_SIZE; // 600
 
-/// Helper: build a U1024 with only the given bit positions set.
-fn bitmap_with_bits(bits: &[i32]) -> U1024 {
+/// Helper: build a bitmap with only the given bit positions set.
+fn bitmap_with_bits(bits: &[i32]) -> PoolTickBitmap {
     let mut limbs = [0u64; 16];
     for &bit in bits {
         assert!((0..1024).contains(&bit), "bit out of range");
         limbs[(bit / 64) as usize] |= 1u64 << (bit % 64);
     }
-    U1024(limbs)
+    PoolTickBitmap(limbs)
 }
+
+/// All-bits-set bitmap (= every tick-array slot is initialized).
+const FULL_BM: PoolTickBitmap = PoolTickBitmap([u64::MAX; 16]);
 
 /// Helper: convert array start index to its bit position in the bitmap.
 fn bit_pos(start_index: i32) -> i32 {
@@ -57,7 +59,7 @@ fn bit_pos(start_index: i32) -> i32 {
 fn next_array_all_bits_walk_down_strict() {
     // Every array slot is initialized → walking down by one tick array each
     // call yields a strict descending sequence: -MULTIPLIER, -2*MULTIPLIER, ...
-    let bm = U1024::max_value();
+    let bm = FULL_BM;
     let mut start = 5 * MULTIPLIER;
     let expected = [
         4 * MULTIPLIER,
@@ -68,7 +70,7 @@ fn next_array_all_bits_walk_down_strict() {
         -MULTIPLIER,
     ];
     for &exp in &expected {
-        let (found, next) = next_initialized_tick_array_start_index(bm, start, SPACING, true);
+        let (found, next) = next_initialized_tick_array_start_index(&bm, start, SPACING, true);
         assert!(found, "expected found at start={start}");
         assert_eq!(next, exp, "wrong next-down from start={start}");
         start = next;
@@ -77,7 +79,7 @@ fn next_array_all_bits_walk_down_strict() {
 
 #[test]
 fn next_array_all_bits_walk_up_strict() {
-    let bm = U1024::max_value();
+    let bm = FULL_BM;
     let mut start = -3 * MULTIPLIER;
     let expected = [
         -2 * MULTIPLIER,
@@ -88,7 +90,7 @@ fn next_array_all_bits_walk_up_strict() {
         3 * MULTIPLIER,
     ];
     for &exp in &expected {
-        let (found, next) = next_initialized_tick_array_start_index(bm, start, SPACING, false);
+        let (found, next) = next_initialized_tick_array_start_index(&bm, start, SPACING, false);
         assert!(found, "expected found at start={start}");
         assert_eq!(next, exp, "wrong next-up from start={start}");
         start = next;
@@ -98,18 +100,18 @@ fn next_array_all_bits_walk_up_strict() {
 #[test]
 fn next_array_empty_bitmap_returns_not_found_at_boundary() {
     // No bits set → walking either direction returns (false, boundary).
-    let bm = U1024::default();
+    let bm = PoolTickBitmap::EMPTY;
     let max_in_bitmap =
         i32::from(SPACING) * TICK_ARRAY_SIZE * solana_clmm_raydium::TICK_ARRAY_BITMAP_SIZE;
 
-    let (found_down, val_down) = next_initialized_tick_array_start_index(bm, 0, SPACING, true);
+    let (found_down, val_down) = next_initialized_tick_array_start_index(&bm, 0, SPACING, true);
     assert!(!found_down);
     assert_eq!(
         val_down, -max_in_bitmap,
         "down-not-found should clamp to -max"
     );
 
-    let (found_up, val_up) = next_initialized_tick_array_start_index(bm, 0, SPACING, false);
+    let (found_up, val_up) = next_initialized_tick_array_start_index(&bm, 0, SPACING, false);
     assert!(!found_up);
     assert_eq!(
         val_up,
@@ -125,7 +127,7 @@ fn next_array_single_bit_finds_only_initialized_array() {
     let target = 5 * MULTIPLIER;
     let bm = bitmap_with_bits(&[bit_pos(target)]);
 
-    let (found, next) = next_initialized_tick_array_start_index(bm, 50 * MULTIPLIER, SPACING, true);
+    let (found, next) = next_initialized_tick_array_start_index(&bm, 50 * MULTIPLIER, SPACING, true);
     assert!(found);
     assert_eq!(
         next, target,
@@ -134,7 +136,7 @@ fn next_array_single_bit_finds_only_initialized_array() {
 
     // Walking up from far below: same array.
     let (found, next) =
-        next_initialized_tick_array_start_index(bm, -50 * MULTIPLIER, SPACING, false);
+        next_initialized_tick_array_start_index(&bm, -50 * MULTIPLIER, SPACING, false);
     assert!(found);
     assert_eq!(
         next, target,
@@ -148,7 +150,7 @@ fn next_array_walk_down_crosses_zero() {
     let bm = bitmap_with_bits(&[bit_pos(-3 * MULTIPLIER), bit_pos(MULTIPLIER)]);
 
     // From start = MULTIPLIER going down: first hit is -3*MULTIPLIER (past 0).
-    let (found, next) = next_initialized_tick_array_start_index(bm, MULTIPLIER, SPACING, true);
+    let (found, next) = next_initialized_tick_array_start_index(&bm, MULTIPLIER, SPACING, true);
     assert!(found);
     assert_eq!(next, -3 * MULTIPLIER);
 }
@@ -157,7 +159,7 @@ fn next_array_walk_down_crosses_zero() {
 fn next_array_walk_up_crosses_zero() {
     let bm = bitmap_with_bits(&[bit_pos(-MULTIPLIER), bit_pos(3 * MULTIPLIER)]);
 
-    let (found, next) = next_initialized_tick_array_start_index(bm, -MULTIPLIER, SPACING, false);
+    let (found, next) = next_initialized_tick_array_start_index(&bm, -MULTIPLIER, SPACING, false);
     assert!(found);
     assert_eq!(next, 3 * MULTIPLIER);
 }
@@ -165,12 +167,12 @@ fn next_array_walk_up_crosses_zero() {
 #[test]
 fn next_array_at_negative_boundary_returns_not_found() {
     // Stepping below the bitmap's lowest representable array → not-found.
-    let bm = U1024::max_value();
+    let bm = FULL_BM;
     let min_array_start =
         -(i32::from(SPACING) * TICK_ARRAY_SIZE * solana_clmm_raydium::TICK_ARRAY_BITMAP_SIZE);
     // last_tick_array_start_index = lowest-representable. Going down should
     // try to step below the bitmap and return not-found.
-    let (found, val) = next_initialized_tick_array_start_index(bm, min_array_start, SPACING, true);
+    let (found, val) = next_initialized_tick_array_start_index(&bm, min_array_start, SPACING, true);
     assert!(!found);
     assert_eq!(
         val, min_array_start,

@@ -81,7 +81,9 @@ pub use liquidity_math::{
 
 pub use swap_math::{compute_swap_step, SwapStep};
 
-pub use tick_array_bit_map::{next_initialized_tick_array_start_index, TICK_ARRAY_BITMAP_SIZE};
+pub use tick_array_bit_map::{
+    next_initialized_tick_array_start_index, PoolTickBitmap, TICK_ARRAY_BITMAP_SIZE,
+};
 
 pub use state_helpers::{
     array_start_index_for_tick, is_tick_out_of_boundary, is_valid_tick_array_start_index,
