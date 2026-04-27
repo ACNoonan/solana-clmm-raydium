@@ -31,6 +31,7 @@ use super::raydium::{AMM_CONFIG_DISC, OBSERVATION_STATE_DISC, TICK_ARRAY_STATE_D
 
 pub const AMM_CONFIG_LEN: usize = 117;
 
+#[allow(clippy::too_many_arguments)] // mirrors upstream AmmConfig field set
 pub fn ammconfig_bytes(
     bump: u8,
     index: u16,
