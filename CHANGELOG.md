@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.3.0] — 2026-04-27
+
+The "audit-grade correctness" release. No public API changes vs 0.2 —
+this drop is entirely about locking in correctness through the audit's
+"gold standard" check: a litesvm differential that compares our
+extracted math byte-for-byte against the actual on-chain Raydium CLMM
+program for every captured mainnet fixture.
+
 ### Added
 - **Litesvm differential test — passing on all 12 swap_v2 fixtures**
   (closes the litesvm bullet of #8, the audit's "gold standard" for
@@ -166,6 +174,7 @@ liquidity AMM (CLMM) on Solana, extracted byte-for-byte from
 - Position fee / reward accumulation beyond `liquidity_from_amounts`.
 - Litesvm differential test (replays against a forked program).
 
-[Unreleased]: https://github.com/ACNoonan/solana-clmm-raydium/compare/v0.2.0...HEAD
+[Unreleased]: https://github.com/ACNoonan/solana-clmm-raydium/compare/v0.3.0...HEAD
+[0.3.0]: https://github.com/ACNoonan/solana-clmm-raydium/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/ACNoonan/solana-clmm-raydium/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/ACNoonan/solana-clmm-raydium/releases/tag/v0.1.0
