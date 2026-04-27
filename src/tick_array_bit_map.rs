@@ -61,7 +61,9 @@ pub fn get_bitmap_tick_boundary(tick_array_start_index: i32, tick_spacing: u16) 
     }
 }
 
-pub fn most_significant_bit(x: U1024) -> Option<u16> {
+// Demoted to crate-private: these take `U1024` and would re-leak it
+// otherwise (#6). Used internally by `next_initialized_tick_array_start_index`.
+pub(crate) fn most_significant_bit(x: U1024) -> Option<u16> {
     if x.is_zero() {
         None
     } else {
@@ -69,7 +71,7 @@ pub fn most_significant_bit(x: U1024) -> Option<u16> {
     }
 }
 
-pub fn least_significant_bit(x: U1024) -> Option<u16> {
+pub(crate) fn least_significant_bit(x: U1024) -> Option<u16> {
     if x.is_zero() {
         None
     } else {

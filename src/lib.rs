@@ -29,9 +29,9 @@
 //!
 //! # Out of scope
 //!
-//! - Pool / tick-array account decoding (this crate takes pre-decoded state)
-//! - Multi-tick `compute_swap_full` (composing it requires fetching tick-array
-//!   accounts; that is the consumer's responsibility)
+//! - Pool / tick-array account decoding (this crate takes pre-decoded state;
+//!   caller flattens decoded `TickArrayState`s into the
+//!   [`InitializedTick`] slice that [`compute_swap_full`] consumes)
 //! - Token-2022 mint-extension TLV decoding and transfer-hook execution
 //!   (caller resolves the active [`TransferFee`] and CPIs hook programs)
 //! - Position fee and reward accumulation beyond `liquidity_from_amounts`
@@ -77,9 +77,15 @@ pub use tick_math::{
 };
 
 pub use liquidity_math::{
-    add_delta, cross, get_delta_amount_0_unsigned, get_delta_amount_1_unsigned,
-    get_delta_amounts_signed, get_liquidity_from_amounts, get_liquidity_from_single_amount_0,
-    get_liquidity_from_single_amount_1,
+    add_delta, cross, get_delta_amount_0_signed, get_delta_amount_0_unsigned,
+    get_delta_amount_1_signed, get_delta_amount_1_unsigned, get_delta_amounts_signed,
+    get_liquidity_from_amount_0, get_liquidity_from_amount_1, get_liquidity_from_amounts,
+    get_liquidity_from_single_amount_0, get_liquidity_from_single_amount_1,
+};
+
+pub use sqrt_price_math::{
+    get_next_sqrt_price_from_amount_0_rounding_up, get_next_sqrt_price_from_amount_1_rounding_down,
+    get_next_sqrt_price_from_input, get_next_sqrt_price_from_output,
 };
 
 pub use swap_math::{compute_swap_step, SwapStep};
@@ -87,7 +93,8 @@ pub use swap_math::{compute_swap_step, SwapStep};
 pub use swap_full::{compute_swap_full, InitializedTick, SwapPool, SwapResult};
 
 pub use tick_array_bit_map::{
-    next_initialized_tick_array_start_index, PoolTickBitmap, TICK_ARRAY_BITMAP_SIZE,
+    check_current_tick_array_is_initialized, next_initialized_tick_array_start_index,
+    PoolTickBitmap, TICK_ARRAY_BITMAP_SIZE,
 };
 
 pub use state_helpers::{
