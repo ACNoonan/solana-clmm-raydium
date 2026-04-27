@@ -15,7 +15,8 @@ use solana_pubkey::Pubkey;
 
 /// Mainnet Raydium CLMM program id
 /// (`CAMMCzo5YL8w4VFF8KVHrK22GGUsp5VTaW7grrKgrWqK`).
-pub const PROGRAM_ID: Pubkey = solana_pubkey::pubkey!("CAMMCzo5YL8w4VFF8KVHrK22GGUsp5VTaW7grrKgrWqK");
+pub const PROGRAM_ID: Pubkey =
+    solana_pubkey::pubkey!("CAMMCzo5YL8w4VFF8KVHrK22GGUsp5VTaW7grrKgrWqK");
 
 // ---- Anchor account discriminators ----
 

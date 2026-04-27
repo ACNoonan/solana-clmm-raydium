@@ -40,12 +40,16 @@ spl-token-2022-interface = "2"
 spl-pod = "0.7"
 # litesvm differential-test harness. Loads the on-chain Raydium CLMM
 # program ELF (`tests/fixtures/raydium_clmm.so`) into an in-process VM
-# and (eventually — see `tests/litesvm_diff.rs::differential_swap_byte_exact`)
-# executes swap instructions for differential comparison with our extracted
-# math. Heavy graph but dev-deps don't reach consumers.
-#
-# Currently scaffolded with a smoke test only; the full differential needs
-# extra solana-* crates (solana-keypair, solana-message, solana-signer,
-# solana-transaction, solana-instruction) — add them when the encoders land.
+# and executes swap instructions for differential comparison with our
+# extracted math. All version-pinned to what litesvm 0.6.1 transitively
+# requires — mismatched solana-* major versions surface as confusing
+# `expected solana_pubkey::Pubkey, found Pubkey` errors at compile time.
 litesvm = "0.6.1"
-solana-pubkey = "2.2"  # match the version litesvm 0.6.1 depends on
+solana-account = "2.2"
+solana-pubkey = "2.2"
+solana-keypair = "2.2"
+solana-instruction = "=2.2.1"
+solana-message = "=2.2.1"
+solana-signer = "=2.2.1"
+solana-transaction = "=2.2.1"
+solana-clock = "=2.2.1"

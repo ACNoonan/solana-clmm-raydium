@@ -8,16 +8,45 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
-- **Litesvm differential-test scaffolding** (toward #8). Mainnet Raydium
-  CLMM program ELF captured at `tests/fixtures/raydium_clmm.so`, loaded
-  into a `litesvm::LiteSVM` instance in `tests/litesvm_diff.rs`. Smoke
-  test verifies the ELF loads and registers as executable. The full
-  differential (compare on-chain program output to `compute_swap_full`
-  byte-for-byte across fuzzed inputs) is `#[ignore]`'d with a detailed
-  TODO list — remaining work is encoder-side (Anchor account encoders
-  symmetric to `tests/support/decode.rs`'s read side, plus instruction
-  build). Program ELF and large fixtures `package.exclude`'d so `cargo
-  publish` artifacts stay lean.
+- **Litesvm differential test — passing on all 12 swap_v2 fixtures**
+  (closes the litesvm bullet of #8, the audit's "gold standard" for
+  AMM math correctness). `tests/litesvm_diff.rs` loads the captured
+  Raydium CLMM mainnet program ELF (~1.7MB at
+  `tests/fixtures/raydium_clmm.so`) into an in-process VM, injects
+  synthesized `AmmConfig`, `ObservationState`, SPL `Mint` and
+  `TokenAccount` images alongside the captured pool + tick-array bytes,
+  warps the VM clock to the fixture's `block_time`, and executes the
+  same `swap_v2` instruction mainnet recorded. Asserts three-way
+  byte-exact agreement: extracted `compute_swap_full` ≡ captured
+  `observed_amount_in/out` ≡ on-chain Raydium program output. Removes
+  the dependency on capturing fresh mainnet fixtures to verify
+  correctness — a future Raydium program upgrade with even subtle
+  math drift will surface here on the next dev build.
+- **Account encoders** (`tests/support/encode.rs`) symmetric to the
+  existing read-side `decode.rs`: `ammconfig_bytes`,
+  `observation_state_bytes`, `empty_tick_array_bytes`,
+  `spl_mint_bytes`, `spl_token_account_bytes`. Layouts pinned via
+  unit tests so any drift surfaces immediately.
+- **Anchor discriminator constants** (`tests/support/raydium.rs`)
+  pre-computed from `sha256("account:<TypeName>")[..8]` and
+  `sha256("global:<ix>")[..8]` for `PoolState`, `AmmConfig`,
+  `TickArrayState`, `ObservationState`, plus `swap` and `swap_v2`.
+- **`PoolState` decoder** now exposes `amm_config`, `mint_0/1`,
+  `vault_0/1`, `observation_key` pubkeys plus `mint_decimals_0/1`.
+  Previously private to the read path; needed for the litesvm test
+  to inject support accounts at the captured pool's referenced
+  addresses.
+
+### Notes
+- Program ELF and the existing mainnet swap fixtures stay tracked in
+  git so contributors can run the harness locally, but are
+  `package.exclude`'d so they don't bloat the published crate. Adds
+  several solana-* dev-deps version-pinned to what `litesvm 0.6.1`
+  transitively requires — invisible to consumers.
+- The pattern from `MeteoraAg/dlmm-sdk`
+  `commons/tests/integration/test_swap.rs` carries directly to a
+  future `solana-dlmm-meteora` differential test (see that repo's
+  `DESIGN.md`).
 
 ## [0.2.0] — 2026-04-27
 

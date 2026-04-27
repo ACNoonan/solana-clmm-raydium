@@ -12,7 +12,7 @@
 
 #![allow(dead_code)] // some helpers are scenario-specific; not all tests use all
 
-use super::raydium::{AMM_CONFIG_DISC, OBSERVATION_STATE_DISC};
+use super::raydium::{AMM_CONFIG_DISC, OBSERVATION_STATE_DISC, TICK_ARRAY_STATE_DISC};
 
 // ---- AmmConfig ----
 //
@@ -87,6 +87,34 @@ pub fn observation_state_bytes(pool_id: &[u8; 32]) -> Vec<u8> {
     out
 }
 
+// ---- Empty TickArrayState ----
+//
+// 10240 bytes:
+//   8       discriminator
+//   32      pool_id
+//   4       start_tick_index
+//   168*60  ticks (all zeroed = uninitialized)
+//   1       initialized_tick_count = 0
+//   8       recent_epoch
+//   107     padding
+
+pub const TICK_ARRAY_LEN: usize = 10240;
+
+/// Empty tick-array account at the given start index. The on-chain swap
+/// requires the FIRST tick-array passed to be the one containing
+/// `pool.tick_current`, even if it has no initialized ticks. Captured
+/// fixtures only include arrays the swap actually crossed, so we
+/// synthesize empties for the leading array(s) when needed.
+pub fn empty_tick_array_bytes(pool_id: &[u8; 32], start_tick_index: i32) -> Vec<u8> {
+    let mut out = vec![0u8; TICK_ARRAY_LEN];
+    out[0..8].copy_from_slice(&TICK_ARRAY_STATE_DISC);
+    out[8..40].copy_from_slice(pool_id);
+    out[40..44].copy_from_slice(&start_tick_index.to_le_bytes());
+    // initialized_tick_count at offset 8 + 32 + 4 + 168*60 = 10124, leave 0.
+    debug_assert_eq!(out.len(), TICK_ARRAY_LEN);
+    out
+}
+
 // ---- SPL Token Mint ----
 //
 // 82 bytes:
@@ -130,7 +158,7 @@ pub fn spl_token_account_bytes(mint: &[u8; 32], owner: &[u8; 32], amount: u64) -
     out.extend_from_slice(&amount.to_le_bytes());
     write_coption_pubkey(&mut out, None); // delegate
     out.push(1); // AccountState::Initialized
-    // is_native: COption<u64> = None (4 bytes 0 + 8 bytes pad)
+                 // is_native: COption<u64> = None (4 bytes 0 + 8 bytes pad)
     out.extend_from_slice(&[0u8; 12]);
     out.extend_from_slice(&0u64.to_le_bytes()); // delegated_amount
     write_coption_pubkey(&mut out, None); // close_authority
@@ -192,7 +220,10 @@ mod tests {
         assert_eq!(&bytes[0..32], &mint);
         assert_eq!(&bytes[32..64], &owner);
         // amount at offset 64
-        assert_eq!(u64::from_le_bytes(bytes[64..72].try_into().unwrap()), 1_000_000);
+        assert_eq!(
+            u64::from_le_bytes(bytes[64..72].try_into().unwrap()),
+            1_000_000
+        );
         // AccountState at offset 108
         assert_eq!(bytes[108], 1); // Initialized
     }
