@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- **Litesvm differential-test scaffolding** (toward #8). Mainnet Raydium
+  CLMM program ELF captured at `tests/fixtures/raydium_clmm.so`, loaded
+  into a `litesvm::LiteSVM` instance in `tests/litesvm_diff.rs`. Smoke
+  test verifies the ELF loads and registers as executable. The full
+  differential (compare on-chain program output to `compute_swap_full`
+  byte-for-byte across fuzzed inputs) is `#[ignore]`'d with a detailed
+  TODO list — remaining work is encoder-side (Anchor account encoders
+  symmetric to `tests/support/decode.rs`'s read side, plus instruction
+  build). Program ELF and large fixtures `package.exclude`'d so `cargo
+  publish` artifacts stay lean.
+
 ## [0.2.0] — 2026-04-27
 
 The "everything the audit and v0.1 issue tracker called out" release. New

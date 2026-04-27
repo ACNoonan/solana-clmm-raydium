@@ -10,6 +10,14 @@ categories = ["finance", "mathematics", "no-std"]
 readme = "README.md"
 repository = "https://github.com/ACNoonan/solana-clmm-raydium"
 documentation = "https://docs.rs/solana-clmm-raydium"
+# Keep the differential-test program ELF and large mainnet fixtures out of the
+# crates.io artifact. They're tracked in git so contributors can run the
+# litesvm tests, but published consumers don't need them.
+exclude = [
+    "tests/fixtures/raydium_clmm.so",
+    "tests/fixtures/swap_*.json",
+    "tests/fixtures/clmm_pool_metadata.json",
+]
 
 [lib]
 doctest = false
@@ -30,3 +38,14 @@ spl-token-2022-interface = "2"
 # `TransferFee`. Already in the spl-token-2022-interface graph; named here
 # explicitly so we can construct test fixtures.
 spl-pod = "0.7"
+# litesvm differential-test harness. Loads the on-chain Raydium CLMM
+# program ELF (`tests/fixtures/raydium_clmm.so`) into an in-process VM
+# and (eventually — see `tests/litesvm_diff.rs::differential_swap_byte_exact`)
+# executes swap instructions for differential comparison with our extracted
+# math. Heavy graph but dev-deps don't reach consumers.
+#
+# Currently scaffolded with a smoke test only; the full differential needs
+# extra solana-* crates (solana-keypair, solana-message, solana-signer,
+# solana-transaction, solana-instruction) — add them when the encoders land.
+litesvm = "0.6.1"
+solana-pubkey = "2.2"  # match the version litesvm 0.6.1 depends on
