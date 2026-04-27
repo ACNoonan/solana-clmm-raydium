@@ -25,15 +25,12 @@
 //!   building the Anchor `swap_v2` instruction with correct account metas
 //!   and discriminator. Tracked in the v0.3 milestone (#8).
 
+mod support;
+
 use std::path::PathBuf;
 
 use litesvm::LiteSVM;
-use solana_pubkey::Pubkey;
-
-/// Mainnet Raydium CLMM program id.
-fn raydium_clmm_program_id() -> Pubkey {
-    Pubkey::try_from("CAMMCzo5YL8w4VFF8KVHrK22GGUsp5VTaW7grrKgrWqK").unwrap()
-}
+use support::raydium::PROGRAM_ID;
 
 /// Path to the program ELF. Captured once via `getAccountInfo` on the
 /// upgradeable programdata account at slot ~415M; see commit history for
@@ -45,12 +42,11 @@ fn program_elf_path() -> PathBuf {
 #[test]
 fn smoke_program_loads() {
     let mut svm = LiteSVM::new();
-    let program_id = raydium_clmm_program_id();
-    svm.add_program_from_file(program_id, program_elf_path())
+    svm.add_program_from_file(PROGRAM_ID, program_elf_path())
         .expect("ELF loads");
 
     let acct = svm
-        .get_account(&program_id)
+        .get_account(&PROGRAM_ID)
         .expect("program account registered after add_program_from_file");
     assert!(acct.executable, "program account must be executable");
     assert!(
@@ -106,7 +102,7 @@ fn differential_swap_byte_exact() {
     //      with shrinking. This is what closes #8's litesvm bullet.
 
     let mut svm = LiteSVM::new();
-    svm.add_program_from_file(raydium_clmm_program_id(), program_elf_path())
+    svm.add_program_from_file(PROGRAM_ID, program_elf_path())
         .expect("ELF loads");
     panic!("not implemented — see TODO list above");
 }
