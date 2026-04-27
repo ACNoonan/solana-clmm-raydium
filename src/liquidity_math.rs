@@ -35,7 +35,11 @@ pub fn add_delta(x: u128, y: i128) -> Result<u128> {
 /// `zero_for_one`). Every multi-tick walker needs exactly this primitive;
 /// it lived in `tests/replay.rs` only until v0.2.
 pub fn cross(liquidity: u128, liquidity_net: i128, zero_for_one: bool) -> Result<u128> {
-    let net = if zero_for_one { -liquidity_net } else { liquidity_net };
+    let net = if zero_for_one {
+        -liquidity_net
+    } else {
+        liquidity_net
+    };
     add_delta(liquidity, net)
 }
 

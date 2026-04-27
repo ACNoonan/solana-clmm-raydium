@@ -275,11 +275,8 @@ mod tests {
                 for amount_in in [1u64, 100, 10_000, 1_000_000, 1_000_000_000_000] {
                     let fee_in = calculate_fee(&f, amount_in).unwrap();
                     let post = amount_in - fee_in;
-                    let fee_inv = calculate_fee(
-                        &f,
-                        reverse_apply_transfer_fee(&f, post).unwrap(),
-                    )
-                    .unwrap();
+                    let fee_inv =
+                        calculate_fee(&f, reverse_apply_transfer_fee(&f, post).unwrap()).unwrap();
                     assert!(
                         fee_in >= fee_inv,
                         "bps={bps} cap={cap} amt={amount_in} fee_in={fee_in} fee_inv={fee_inv}",

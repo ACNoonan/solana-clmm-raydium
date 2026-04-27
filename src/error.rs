@@ -18,7 +18,9 @@ impl ErrorCode {
     pub const fn reason(self) -> &'static str {
         match self {
             ErrorCode::TickUpperOverflow => "tick_upper exceeds MAX_TICK",
-            ErrorCode::SqrtPriceX64 => "sqrt_price_x64 out of [MIN_SQRT_PRICE_X64, MAX_SQRT_PRICE_X64)",
+            ErrorCode::SqrtPriceX64 => {
+                "sqrt_price_x64 out of [MIN_SQRT_PRICE_X64, MAX_SQRT_PRICE_X64)"
+            }
             ErrorCode::LiquiditySubValueErr => "liquidity subtraction underflow",
             ErrorCode::LiquidityAddValueErr => "liquidity addition overflow",
             ErrorCode::MaxTokenOverflow => "u64 token amount overflow",

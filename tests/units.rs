@@ -127,7 +127,8 @@ fn next_array_single_bit_finds_only_initialized_array() {
     let target = 5 * MULTIPLIER;
     let bm = bitmap_with_bits(&[bit_pos(target)]);
 
-    let (found, next) = next_initialized_tick_array_start_index(&bm, 50 * MULTIPLIER, SPACING, true);
+    let (found, next) =
+        next_initialized_tick_array_start_index(&bm, 50 * MULTIPLIER, SPACING, true);
     assert!(found);
     assert_eq!(
         next, target,
@@ -320,10 +321,22 @@ fn delta_amounts_pinned_unit_liquidity_one_tick() {
     // t=[0, 1], L=1: sub-unit fractions get rounded to 0 (down) or 1 (up).
     let sp_lo = get_sqrt_price_at_tick(0).unwrap();
     let sp_hi = get_sqrt_price_at_tick(1).unwrap();
-    assert_eq!(get_delta_amount_0_unsigned(sp_lo, sp_hi, 1, false).unwrap(), 0);
-    assert_eq!(get_delta_amount_0_unsigned(sp_lo, sp_hi, 1, true).unwrap(), 1);
-    assert_eq!(get_delta_amount_1_unsigned(sp_lo, sp_hi, 1, false).unwrap(), 0);
-    assert_eq!(get_delta_amount_1_unsigned(sp_lo, sp_hi, 1, true).unwrap(), 1);
+    assert_eq!(
+        get_delta_amount_0_unsigned(sp_lo, sp_hi, 1, false).unwrap(),
+        0
+    );
+    assert_eq!(
+        get_delta_amount_0_unsigned(sp_lo, sp_hi, 1, true).unwrap(),
+        1
+    );
+    assert_eq!(
+        get_delta_amount_1_unsigned(sp_lo, sp_hi, 1, false).unwrap(),
+        0
+    );
+    assert_eq!(
+        get_delta_amount_1_unsigned(sp_lo, sp_hi, 1, true).unwrap(),
+        1
+    );
 }
 
 #[test]
@@ -335,10 +348,22 @@ fn delta_amounts_pinned_1e15_liquidity_one_tick() {
     let sp_lo = get_sqrt_price_at_tick(0).unwrap();
     let sp_hi = get_sqrt_price_at_tick(1).unwrap();
     let liq: u128 = 1_000_000_000_000_000;
-    assert_eq!(get_delta_amount_0_unsigned(sp_lo, sp_hi, liq, false).unwrap(), 49_996_250_312);
-    assert_eq!(get_delta_amount_0_unsigned(sp_lo, sp_hi, liq, true).unwrap(), 49_996_250_313);
-    assert_eq!(get_delta_amount_1_unsigned(sp_lo, sp_hi, liq, false).unwrap(), 49_998_750_062);
-    assert_eq!(get_delta_amount_1_unsigned(sp_lo, sp_hi, liq, true).unwrap(), 49_998_750_063);
+    assert_eq!(
+        get_delta_amount_0_unsigned(sp_lo, sp_hi, liq, false).unwrap(),
+        49_996_250_312
+    );
+    assert_eq!(
+        get_delta_amount_0_unsigned(sp_lo, sp_hi, liq, true).unwrap(),
+        49_996_250_313
+    );
+    assert_eq!(
+        get_delta_amount_1_unsigned(sp_lo, sp_hi, liq, false).unwrap(),
+        49_998_750_062
+    );
+    assert_eq!(
+        get_delta_amount_1_unsigned(sp_lo, sp_hi, liq, true).unwrap(),
+        49_998_750_063
+    );
 }
 
 #[test]
@@ -348,10 +373,22 @@ fn delta_amounts_pinned_1e18_liquidity_symmetric_range() {
     let sp_lo = get_sqrt_price_at_tick(-100).unwrap();
     let sp_hi = get_sqrt_price_at_tick(100).unwrap();
     let liq: u128 = 1_000_000_000_000_000_000;
-    assert_eq!(get_delta_amount_0_unsigned(sp_lo, sp_hi, liq, false).unwrap(), 9_999_541_693_797_069);
-    assert_eq!(get_delta_amount_0_unsigned(sp_lo, sp_hi, liq, true).unwrap(), 9_999_541_693_797_070);
-    assert_eq!(get_delta_amount_1_unsigned(sp_lo, sp_hi, liq, false).unwrap(), 9_999_541_693_797_069);
-    assert_eq!(get_delta_amount_1_unsigned(sp_lo, sp_hi, liq, true).unwrap(), 9_999_541_693_797_070);
+    assert_eq!(
+        get_delta_amount_0_unsigned(sp_lo, sp_hi, liq, false).unwrap(),
+        9_999_541_693_797_069
+    );
+    assert_eq!(
+        get_delta_amount_0_unsigned(sp_lo, sp_hi, liq, true).unwrap(),
+        9_999_541_693_797_070
+    );
+    assert_eq!(
+        get_delta_amount_1_unsigned(sp_lo, sp_hi, liq, false).unwrap(),
+        9_999_541_693_797_069
+    );
+    assert_eq!(
+        get_delta_amount_1_unsigned(sp_lo, sp_hi, liq, true).unwrap(),
+        9_999_541_693_797_070
+    );
 }
 
 #[test]
@@ -407,7 +444,10 @@ fn cross_subtracts_liquidity_net_when_moving_down() {
 fn cross_handles_negative_liquidity_net() {
     // Negative liquidity_net (typical at upper boundary of a position).
     assert_eq!(solana_clmm_raydium::cross(1_000, -250, false).unwrap(), 750);
-    assert_eq!(solana_clmm_raydium::cross(1_000, -250, true).unwrap(), 1_250);
+    assert_eq!(
+        solana_clmm_raydium::cross(1_000, -250, true).unwrap(),
+        1_250
+    );
 }
 
 #[test]
