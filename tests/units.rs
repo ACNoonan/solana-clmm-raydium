@@ -306,3 +306,136 @@ fn delta_amounts_round_up_geq_round_down() {
     assert!(amt1_up >= amt1_down);
     assert!(amt1_up - amt1_down <= 1);
 }
+
+// ---- get_delta_amount_*_unsigned: value-pinned (issue #7) ----
+//
+// Captured from the byte-exact-extracted math; if any of these change, the
+// arithmetic has drifted. Round-up = round-down + 0 or 1 always (also
+// asserted as a property in tests/properties.rs).
+
+#[test]
+fn delta_amounts_pinned_unit_liquidity_one_tick() {
+    // t=[0, 1], L=1: sub-unit fractions get rounded to 0 (down) or 1 (up).
+    let sp_lo = get_sqrt_price_at_tick(0).unwrap();
+    let sp_hi = get_sqrt_price_at_tick(1).unwrap();
+    assert_eq!(get_delta_amount_0_unsigned(sp_lo, sp_hi, 1, false).unwrap(), 0);
+    assert_eq!(get_delta_amount_0_unsigned(sp_lo, sp_hi, 1, true).unwrap(), 1);
+    assert_eq!(get_delta_amount_1_unsigned(sp_lo, sp_hi, 1, false).unwrap(), 0);
+    assert_eq!(get_delta_amount_1_unsigned(sp_lo, sp_hi, 1, true).unwrap(), 1);
+}
+
+#[test]
+fn delta_amounts_pinned_1e15_liquidity_one_tick() {
+    // t=[0, 1], L=1e15. sp_lo = Q64 = 2^64. The amount_0 and amount_1
+    // formulas differ slightly so the values aren't identical:
+    //   Δy ≈ L * (sp_hi/Q64 - 1)  ≈ 1e15 * (1.0001^0.5 - 1)
+    //   Δx ≈ L * (sp_hi/Q64 - 1) / (sp_hi/Q64) — the 1/sp_hi factor makes Δx slightly smaller.
+    let sp_lo = get_sqrt_price_at_tick(0).unwrap();
+    let sp_hi = get_sqrt_price_at_tick(1).unwrap();
+    let liq: u128 = 1_000_000_000_000_000;
+    assert_eq!(get_delta_amount_0_unsigned(sp_lo, sp_hi, liq, false).unwrap(), 49_996_250_312);
+    assert_eq!(get_delta_amount_0_unsigned(sp_lo, sp_hi, liq, true).unwrap(), 49_996_250_313);
+    assert_eq!(get_delta_amount_1_unsigned(sp_lo, sp_hi, liq, false).unwrap(), 49_998_750_062);
+    assert_eq!(get_delta_amount_1_unsigned(sp_lo, sp_hi, liq, true).unwrap(), 49_998_750_063);
+}
+
+#[test]
+fn delta_amounts_pinned_1e18_liquidity_symmetric_range() {
+    // Symmetric range ([-100, 100]) at L=1e18. Δx and Δy are equal here
+    // because the symmetry of the price range makes the integrals match.
+    let sp_lo = get_sqrt_price_at_tick(-100).unwrap();
+    let sp_hi = get_sqrt_price_at_tick(100).unwrap();
+    let liq: u128 = 1_000_000_000_000_000_000;
+    assert_eq!(get_delta_amount_0_unsigned(sp_lo, sp_hi, liq, false).unwrap(), 9_999_541_693_797_069);
+    assert_eq!(get_delta_amount_0_unsigned(sp_lo, sp_hi, liq, true).unwrap(), 9_999_541_693_797_070);
+    assert_eq!(get_delta_amount_1_unsigned(sp_lo, sp_hi, liq, false).unwrap(), 9_999_541_693_797_069);
+    assert_eq!(get_delta_amount_1_unsigned(sp_lo, sp_hi, liq, true).unwrap(), 9_999_541_693_797_070);
+}
+
+#[test]
+fn delta_amounts_args_swapped_yields_same() {
+    // The functions internally swap args so sqrt_a < sqrt_b; passing them
+    // in either order must yield identical output.
+    let sp_a = get_sqrt_price_at_tick(50).unwrap();
+    let sp_b = get_sqrt_price_at_tick(150).unwrap();
+    let liq: u128 = 1_000_000_000_000;
+    assert_eq!(
+        get_delta_amount_0_unsigned(sp_a, sp_b, liq, false).unwrap(),
+        get_delta_amount_0_unsigned(sp_b, sp_a, liq, false).unwrap(),
+    );
+    assert_eq!(
+        get_delta_amount_1_unsigned(sp_a, sp_b, liq, true).unwrap(),
+        get_delta_amount_1_unsigned(sp_b, sp_a, liq, true).unwrap(),
+    );
+}
+
+#[test]
+fn delta_amounts_overflow_at_max_liquidity() {
+    // L = u128::MAX over a wide range overflows the u64 token amount —
+    // verifies the MaxTokenOverflow error path on both functions.
+    let sp_lo = get_sqrt_price_at_tick(-1000).unwrap();
+    let sp_hi = get_sqrt_price_at_tick(1000).unwrap();
+    assert_eq!(
+        get_delta_amount_0_unsigned(sp_lo, sp_hi, u128::MAX, false).unwrap_err(),
+        ErrorCode::MaxTokenOverflow,
+    );
+    assert_eq!(
+        get_delta_amount_1_unsigned(sp_lo, sp_hi, u128::MAX, true).unwrap_err(),
+        ErrorCode::MaxTokenOverflow,
+    );
+}
+
+// ---- cross() (issue #3) ----
+
+#[test]
+fn cross_adds_liquidity_net_when_moving_up() {
+    // zero_for_one=false → moving up the price, add liquidity_net as-is.
+    let result = solana_clmm_raydium::cross(1_000, 250, false).unwrap();
+    assert_eq!(result, 1_250);
+}
+
+#[test]
+fn cross_subtracts_liquidity_net_when_moving_down() {
+    // zero_for_one=true → moving down, subtract liquidity_net.
+    let result = solana_clmm_raydium::cross(1_000, 250, true).unwrap();
+    assert_eq!(result, 750);
+}
+
+#[test]
+fn cross_handles_negative_liquidity_net() {
+    // Negative liquidity_net (typical at upper boundary of a position).
+    assert_eq!(solana_clmm_raydium::cross(1_000, -250, false).unwrap(), 750);
+    assert_eq!(solana_clmm_raydium::cross(1_000, -250, true).unwrap(), 1_250);
+}
+
+#[test]
+fn cross_overflow_traps() {
+    // `cross` delegates to `add_delta`, which has dual-mode behavior:
+    // debug panics on the unsigned add/sub, release wraps and the require!
+    // macro catches. Either outcome is "overflow detected" — the failure
+    // we guard against is a silent wrong return.
+    let underflow = std::panic::catch_unwind(|| solana_clmm_raydium::cross(100, -200, false));
+    match underflow {
+        Err(_) => {}
+        Ok(Err(ErrorCode::LiquiditySubValueErr)) => {}
+        Ok(other) => panic!("cross(100, -200, false) returned {other:?}, expected error"),
+    }
+    let overflow = std::panic::catch_unwind(|| solana_clmm_raydium::cross(u128::MAX, 1, false));
+    match overflow {
+        Err(_) => {}
+        Ok(Err(ErrorCode::LiquidityAddValueErr)) => {}
+        Ok(other) => panic!("cross(u128::MAX, 1, false) returned {other:?}, expected error"),
+    }
+}
+
+// ---- ErrorCode Display + Error (issue #2) ----
+
+#[test]
+fn error_code_display_returns_reason_string() {
+    use core::error::Error;
+    let e = ErrorCode::MaxTokenOverflow;
+    let formatted = format!("{e}");
+    assert_eq!(formatted, e.reason());
+    // core::error::Error trait is implemented (compile-time check).
+    let _: &dyn Error = &e;
+}

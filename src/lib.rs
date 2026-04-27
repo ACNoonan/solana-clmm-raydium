@@ -74,8 +74,8 @@ pub use tick_math::{
 };
 
 pub use liquidity_math::{
-    add_delta, get_delta_amount_0_unsigned, get_delta_amount_1_unsigned, get_delta_amounts_signed,
-    get_liquidity_from_amounts, get_liquidity_from_single_amount_0,
+    add_delta, cross, get_delta_amount_0_unsigned, get_delta_amount_1_unsigned,
+    get_delta_amounts_signed, get_liquidity_from_amounts, get_liquidity_from_single_amount_0,
     get_liquidity_from_single_amount_1,
 };
 

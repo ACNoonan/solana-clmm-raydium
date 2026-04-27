@@ -27,6 +27,18 @@ pub fn add_delta(x: u128, y: i128) -> Result<u128> {
     Ok(z)
 }
 
+/// Apply a tick crossing to active liquidity.
+///
+/// When a swap reaches an initialized tick, the pool's active liquidity
+/// changes by `liquidity_net` — added when crossing left-to-right (price
+/// up), subtracted when crossing right-to-left (price down, i.e.
+/// `zero_for_one`). Every multi-tick walker needs exactly this primitive;
+/// it lived in `tests/replay.rs` only until v0.2.
+pub fn cross(liquidity: u128, liquidity_net: i128, zero_for_one: bool) -> Result<u128> {
+    let net = if zero_for_one { -liquidity_net } else { liquidity_net };
+    add_delta(liquidity, net)
+}
+
 /// Computes the amount of liquidity received for a given amount of token_0 and price range
 /// Calculates ΔL = Δx (√P_upper x √P_lower)/(√P_upper - √P_lower)
 pub fn get_liquidity_from_amount_0(
