@@ -47,27 +47,56 @@ solana-clmm-raydium = "0.1"
   both `amount_in` and `amount_out`. Coverage spans \$0.015–\$2,000 swap
   sizes, both directions, and both `swap` and `swap_v2` instructions.
 
-Out-of-scope items (multi-tick `compute_swap_full`, position fees) are
-listed below; see `CHANGELOG.md` for the v0.2 roadmap and
+Out-of-scope items (account decoding, transfer-hook CPI, position fees)
+are listed below; see `CHANGELOG.md` for the v0.2 roadmap and
 `docs/audits/v0.1.0-external-review.md` for an external audit of test
 coverage and peer comparison.
 
 ## Quickstart
 
+For most callers, `compute_swap_full` is the one call you need — it
+orchestrates the multi-tick walk and returns the total in/out/fee.
+
+```rust
+use solana_clmm_raydium::{compute_swap_full, InitializedTick, SwapPool};
+
+let pool = SwapPool {
+    sqrt_price_x64,
+    liquidity,
+    tick_current,
+    tick_spacing,
+    fee_rate_pips,
+};
+
+// Caller flattens decoded tick arrays into a sorted-ascending slice.
+let initialized_ticks: Vec<InitializedTick> = /* ... */;
+
+let result = compute_swap_full(
+    &pool,
+    &initialized_ticks,
+    /* amount_specified */ 1_000_000,
+    /* sqrt_price_limit_x64 */ 0, // 0 = no limit (remapped to ±1 inside the domain)
+    /* is_base_input */ true,
+    /* zero_for_one */ false,
+)?;
+// result.amount_in, result.amount_out, result.fee_amount,
+// result.final_sqrt_price_x64, result.final_tick, result.final_liquidity,
+// result.steps
+```
+
+If you'd rather drive the loop yourself (custom tick-array streaming, fee
+accumulation, etc.) the lower-level primitives stay public:
+
 ```rust
 use solana_clmm_raydium::{
-    get_sqrt_price_at_tick, get_tick_at_sqrt_price, compute_swap_step,
+    get_sqrt_price_at_tick, get_tick_at_sqrt_price, compute_swap_step, cross,
 };
 
 // tick → sqrt-price (Q64.64)
 let sqrt_price = get_sqrt_price_at_tick(1_000)?;
+let tick = get_tick_at_sqrt_price(sqrt_price)?; // round-trip is exact
 
-// sqrt-price → tick (round-trip is exact across the full tick domain)
-let tick = get_tick_at_sqrt_price(sqrt_price)?;
-assert_eq!(tick, 1_000);
-
-// Single-tick swap step. Caller is responsible for walking tick arrays
-// and feeding successive `compute_swap_step` calls until the swap settles.
+// Single-tick swap step:
 let step = compute_swap_step(
     sqrt_price_current_x64,
     sqrt_price_target_x64,
@@ -76,8 +105,10 @@ let step = compute_swap_step(
     fee_pips,
     is_base_input,
     zero_for_one,
-    block_timestamp,
 )?;
+
+// Apply a tick crossing to active liquidity:
+let liquidity = cross(liquidity, liquidity_net, zero_for_one)?;
 ```
 
 ### Token-2022 transfer fees
@@ -106,15 +137,16 @@ let pool_amount_out = reverse_apply_transfer_fee(&fee_out, target_out)?;
 
 ## Scope
 
-**In scope.** Tick ↔ sqrt-price, liquidity ↔ token-amount, single-tick swap
-step, tick-array bitmap navigation, Token-2022 transfer-fee math
-(byte-exact mirror of `spl_token_2022_interface::extension::transfer_fee`).
-See the [crate-level docs](src/lib.rs) for the full curated public API.
+**In scope.** Tick ↔ sqrt-price, liquidity ↔ token-amount, single-tick and
+multi-tick swap orchestration, tick-array bitmap navigation, Token-2022
+transfer-fee math (byte-exact mirror of
+`spl_token_2022_interface::extension::transfer_fee`). See the
+[crate-level docs](src/lib.rs) for the full curated public API.
 
 **Out of scope.**
 - Pool / tick-array account decoding — this crate takes pre-decoded state.
-- Multi-tick `compute_swap_full` orchestration — composing it requires fetching
-  tick-array accounts at runtime; that is the consumer's job.
+  Caller flattens their decoded `TickArrayState`s into the
+  `&[InitializedTick]` that `compute_swap_full` consumes.
 - Token-2022 mint-extension TLV decoding and transfer-hook execution —
   caller resolves the active `TransferFee` for the current epoch and
   CPIs hook programs.

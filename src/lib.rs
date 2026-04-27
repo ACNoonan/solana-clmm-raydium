@@ -19,6 +19,8 @@
 //! - Liquidity ↔ token-amount conversions
 //!   ([`get_liquidity_from_amounts`], [`get_delta_amounts_signed`], …)
 //! - Single-tick swap step ([`compute_swap_step`])
+//! - Multi-tick swap orchestration
+//!   ([`compute_swap_full`])
 //! - Tick-array bitmap navigation
 //!   ([`next_initialized_tick_array_start_index`])
 //! - Token-2022 transfer-fee math ([`calculate_fee`],
@@ -59,6 +61,7 @@ pub mod error;
 pub mod liquidity_math;
 pub mod sqrt_price_math;
 pub mod state_helpers;
+pub mod swap_full;
 pub mod swap_math;
 pub mod tick_array_bit_map;
 pub mod tick_math;
@@ -80,6 +83,8 @@ pub use liquidity_math::{
 };
 
 pub use swap_math::{compute_swap_step, SwapStep};
+
+pub use swap_full::{compute_swap_full, InitializedTick, SwapPool, SwapResult};
 
 pub use tick_array_bit_map::{
     next_initialized_tick_array_start_index, PoolTickBitmap, TICK_ARRAY_BITMAP_SIZE,
